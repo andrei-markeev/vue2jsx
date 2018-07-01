@@ -1,0 +1,19 @@
+#!/usr/bin/env node
+var path = require('path');
+var fs = require('fs');
+var vue2jsx = require(path.join(__dirname, "..", "vue2jsx.js"));
+
+if (process.argv.length < 2)
+    process.exit();
+
+const result = vue2jsx(fs.readFileSync(process.argv[2], 'utf8'));
+const templateNode = result.childNodes[0];
+const rootNode = templateNode.childNodes.filter(n => n.tagName != "#text")[0];
+const templateName = templateNode.startText.match(/"(.*)"/)[1];
+const templateClass = templateName.replace(/^([a-z])/, (m, g) => g.toUpperCase()).replace(/\-([a-z])/, (m, g) => g.toUpperCase()) + "Component";
+console.log(`VueRender["${ templateName }"] = function(this: ${ templateClass }, h) { return (
+    ${rootNode.render()}
+) }`);
+
+
+process.exit();

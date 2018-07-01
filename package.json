@@ -1,0 +1,26 @@
+{
+  "name": "vue2jsx",
+  "version": "1.0.0",
+  "description": "Convert Vue html templates to their JSX representation.",
+  "main": "vue2jsx.js",
+  "bin": {
+    "vue2jsx": "./bin/vue2jsx"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/andrei-markeev/vue2jsx.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/andrei-markeev/vue2jsx/issues"
+  },
+  "homepage": "https://github.com/andrei-markeev/vue2jsx#readme",
+  "devDependencies": {
+    "@types/node": "^10.5.1"
+  }
+}

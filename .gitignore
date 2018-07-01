@@ -1,0 +1,4 @@
+*.js
+*.js.map
+.vscode/launch.json
+node_modules
