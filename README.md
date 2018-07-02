@@ -16,12 +16,14 @@ vue2jsx my-component.vue > my-component.tsx
 The following Vue SFC:
 ```html
 <script>
-    Vue.component("test-component", {
-        data: () => ({
-            user: null,
-            users: null
-        })
-    });
+    export default {
+        data() {
+            return {
+                user: null,
+                users: null
+            }
+        }
+    }
 </script>
 
 <template>
