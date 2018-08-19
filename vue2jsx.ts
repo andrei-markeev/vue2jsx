@@ -1,5 +1,5 @@
 
-import * as ts from 'typescript';
+import ts from 'typescript';
 
 type Dictionary<T> = { [key: string]: T };
 type Nullable<T> = T | null;
@@ -157,15 +157,20 @@ function processAttr(tagName: string, name: string, value: string | true, curren
         name = "on" + name.substr(5);
         value = processJs(value.slice(1, -1).replace(/^\s+/, ''), currentNode);
 
-        const funcMatch = value.match(/[a-z][A-Za-z_0-9]*\s*\(([^)]*)\)\s*$/);
-        if (funcMatch && funcMatch[1])
-            value = "() => " + value;
-        else if (funcMatch)
-            value = value.replace(/\s*\(\)\s*$/, '');
-        else if (value.indexOf(';') === -1)
-            value = "() => " + value;
+        let param = "()";
+        let condition = "";
+        if (name.endsWith(".enter")) {
+            name = name.slice(0, -6);
+            param = "e";
+            condition = "e.keyCode == 13";
+        }
+
+        if (value.indexOf(';') === -1)
+            value = `${param} => ${condition ? condition + " && " : ""}${value}`;
+        else if (condition)
+            value = `${param} => { if (${condition}) { ${value} } }`;
         else
-            value = "() => { " + value + " } ";
+            value = `${param} => { ${value} }`;
 
         jsxAttr = name + "={ " + value + " }";
     }
@@ -236,8 +241,6 @@ function processJs(jsCode: string, currentNode: ParsedNode)
         .filter(p => localVariables.indexOf(jsCode.substr(p).match(/^[a-zA-Z$_]+/)[0]) == -1)
         .sort((a, b) => b - a)
         .forEach(p => jsCode = jsCode.substr(0, p) + "this." + jsCode.substr(p));
-    if (positions.length)
-        console.warn("=>", jsCode);
     return jsCode;
 
     function analyse(node: ts.Node)
