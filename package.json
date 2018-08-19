@@ -22,5 +22,8 @@
   "homepage": "https://github.com/andrei-markeev/vue2jsx#readme",
   "devDependencies": {
     "@types/node": "^10.5.1"
+  },
+  "dependencies": {
+    "typescript": "^3.0.1"
   }
 }

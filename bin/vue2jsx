@@ -15,9 +15,9 @@ const templateNameMatch = templateNode.startText.match(/"(.*)"/);
 if (templateNameMatch) {
     const templateName = templateNameMatch[1];
     const templateClass = templateName.replace(/^([a-z])/, (m, g) => g.toUpperCase()).replace(/\-([a-z])/, (m, g) => g.toUpperCase()) + "Component";
-    output = `VueRender["${ templateName }"] = function(this: ${ templateClass }, h) { return (\n    ${rootNode.render()}\n}`;
+    output = `VueRender["${ templateName }"] = function(this: ${ templateClass }, h) { return (\n    ${rootNode.render()}\n)}`;
 } else
-    output = `const render = function(h) { return (\n    ${rootNode.render()}\n}`
+    output = `const render = function(h) { return (\n    ${rootNode.render()}\n)}`
 console.log(output);
 
 process.exit();

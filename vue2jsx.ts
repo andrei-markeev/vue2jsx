@@ -1,10 +1,13 @@
+
+import * as ts from 'typescript';
+
 type Dictionary<T> = { [key: string]: T };
 type Nullable<T> = T | null;
-
 class ParsedNode {
 
     constructor(public tagName: string = "", public parentNode: Nullable<ParsedNode> = null) { }
 
+    localVariables: string[] = [];
     childNodes: ParsedNode[] = [];
     startText: string = "";
     endText: string = "";
@@ -101,87 +104,16 @@ function vue2jsx(html: string) {
                             if (attrsMatch[i].replace(/^\s+/, '') == '')
                                 continue;
 
+                            let tagName = match[1];
                             let name = attrsMatch[i].replace(/=.*/, '').replace(/^\s+/, '');
                             let value = attrsMatch[i].replace(/^[^=]+=/, '');
-                            let jsxAttr = name + "=" + value;
+                            if (attrsMatch[i].indexOf('=') === -1)
+                                value = true;
 
-                            if (attrsMatch[i].indexOf('=') === -1) {
-                                name = value.replace(/^\s+/, '');
-                                value = '';
-                                jsxAttr = name;
-                            }
+                            let attrJsx = processAttr(tagName, name, value, currentNode);
 
-                            if (name.indexOf("v-on:") == 0) {
-
-                                name = "on" + name.substr(5);
-                                value = value.slice(1, -1);
-                                const funcMatch = value.match(/^\s*[a-z][A-Za-z_0-9]*\s*\(([^)]*)\)\s*$/);
-                                if (funcMatch && funcMatch[1])
-                                    value = "() => this." + value.replace(/^\s+/, '');
-                                else if (funcMatch)
-                                    value = "this." + value.replace(/^\s+/, '').replace(/\s*\(\)\s*$/, '');
-                                else
-                                    value = "/*REVIEW*/ " + value;
-
-                                jsxAttr = name + "={ " + value + " }";
-
-                            } else if (name.indexOf("v-bind:") == 0) {
-
-                                name = name.substr(7);
-                                jsxAttr = name + "={ " + value.slice(1, -1) + " }";
-
-                            } else if (name == "v-for") {
-
-                                let [elem, elems] = value.slice(1, -1).split(' in ');
-                                if (elem.indexOf(',') > -1 && elem.indexOf('(') == -1)
-                                    elem = "(" + elem + ")";
-                                jsxAttr = "";
-                                currentNode.postProcessor = t => `{ this.${elems}.map(${elem} => ${t}) }`;
-
-                            } else if (name == "v-if") {
-
-                                jsxAttr = "";
-                                const condition = value.slice(1, -1);
-                                currentNode.startIf = true;
-                                currentNode.condition = condition;
-                                currentNode.postProcessor = t => `{ ${condition} && ${t} }`;
-
-                            } else if (name == "v-else-if") {
-
-                                jsxAttr = "";
-                                const children = currentNode.parentNode.childNodes.filter(n => n.tagName != "#text");
-                                const prevNode = children[children.length - 2];
-                                const condition = value.slice(1, -1);
-                                currentNode.condition = condition;
-                                if (prevNode.startIf)
-                                    prevNode.postProcessor = t => `{ ${prevNode.condition} ? ${t}`;
-                                else
-                                    prevNode.postProcessor = t => ` : ${prevNode.condition} ? ${t}`;
-
-                                currentNode.postProcessor = t => ` : ${condition} ? ${t} : null }`;
-
-                            } else if (name == "v-else") {
-
-                                jsxAttr = "";
-                                const children = currentNode.parentNode.childNodes.filter(n => n.tagName != "#text");
-                                const prevNode = children[children.length - 2];
-                                if (prevNode.startIf)
-                                    prevNode.postProcessor = t => `{ ${prevNode.condition} ? ${t}`;
-                                else
-                                    prevNode.postProcessor = t => ` : ${prevNode.condition} ? ${t}`;
-
-                                currentNode.postProcessor = t => ` : ${t} }`;
-
-                            } else if (name == "v-model") {
-
-                                const oninput = match[1] == 'input' || match[1] == 'textarea' ? "oninput" : "onchange";
-                                const model = "this." + value.slice(1, -1);
-                                jsxAttr = `value={ ${model} } ${oninput}={ e => ${model} = e.target.value }`;
-
-                            }
-
-                            if (jsxAttr)
-                                attrsJsx += " " + jsxAttr;
+                            if (attrJsx)
+                                attrsJsx += " " + attrJsx;
                         }
                     }
                     startTagJsx += "<" + match[1] + attrsJsx + match[match.length - 1] + ">";
@@ -216,4 +148,129 @@ function vue2jsx(html: string) {
 
 }
 
-module.exports = vue2jsx;
+function processAttr(tagName: string, name: string, value: string | true, currentNode: ParsedNode) {
+    let jsxAttr = name + "=" + value;
+    if (value === true) {
+        jsxAttr = name;
+    }
+    else if (name.indexOf("v-on:") == 0) {
+        name = "on" + name.substr(5);
+        value = processJs(value.slice(1, -1).replace(/^\s+/, ''), currentNode);
+
+        const funcMatch = value.match(/[a-z][A-Za-z_0-9]*\s*\(([^)]*)\)\s*$/);
+        if (funcMatch && funcMatch[1])
+            value = "() => " + value;
+        else if (funcMatch)
+            value = value.replace(/\s*\(\)\s*$/, '');
+        else if (value.indexOf(';') === -1)
+            value = "() => " + value;
+        else
+            value = "() => { " + value + " } ";
+
+        jsxAttr = name + "={ " + value + " }";
+    }
+    else if (name.indexOf("v-bind:") == 0) {
+        name = name.substr(7);
+        jsxAttr = name + "={ " + processJs(value.slice(1, -1), currentNode) + " }";
+    }
+    else if (name == "v-for") {
+        let [elem, elems] = value.slice(1, -1).split(' in ');
+        if (elem.indexOf(',') > -1 && elem.indexOf('(') == -1)
+            elem = "(" + elem + ")";
+        jsxAttr = "";
+        currentNode.localVariables = elem.replace(/^\(|\)$|\s+/g, '').split(',');
+        currentNode.postProcessor = t => `{ this.${elems}.map(${elem} => ${t}) }`;
+    }
+    else if (name == "v-if") {
+        jsxAttr = "";
+        const condition = processJs(value.slice(1, -1), currentNode);
+        currentNode.startIf = true;
+        currentNode.condition = condition;
+        currentNode.postProcessor = t => `{ ${condition} && ${t} }`;
+    }
+    else if (name == "v-else-if") {
+        jsxAttr = "";
+        const children = currentNode.parentNode.childNodes.filter(n => n.tagName != "#text");
+        const prevNode = children[children.length - 2];
+        const condition = processJs(value.slice(1, -1), currentNode);
+        currentNode.condition = condition;
+        if (prevNode.startIf)
+            prevNode.postProcessor = t => `{ ${prevNode.condition} ? ${t}`;
+        else
+            prevNode.postProcessor = t => ` : ${prevNode.condition} ? ${t}`;
+        currentNode.postProcessor = t => ` : ${condition} ? ${t} : null }`;
+    }
+    else if (name == "v-else") {
+        jsxAttr = "";
+        const children = currentNode.parentNode.childNodes.filter(n => n.tagName != "#text");
+        const prevNode = children[children.length - 2];
+        if (prevNode.startIf)
+            prevNode.postProcessor = t => `{ ${prevNode.condition} ? ${t}`;
+        else
+            prevNode.postProcessor = t => ` : ${prevNode.condition} ? ${t}`;
+        currentNode.postProcessor = t => ` : ${t} }`;
+    }
+    else if (name == "v-model") {
+        const oninput = tagName == 'input' || tagName == 'textarea' ? "oninput" : "onchange";
+        const model = processJs(value.slice(1, -1), currentNode);
+        jsxAttr = `value={ ${model} } ${oninput}={ e => ${model} = e.target.value }`;
+    }
+    return jsxAttr;
+}
+
+function processJs(jsCode: string, currentNode: ParsedNode)
+{
+    let fileNode = ts.createSourceFile("test.ts", "(" + jsCode + ")", ts.ScriptTarget.ES5);
+
+    let localVariables = [];
+    while (currentNode.parentNode) {
+        currentNode = currentNode.parentNode;
+        localVariables = localVariables.concat(currentNode.localVariables);
+    }
+
+    let positions: number[] = [];
+    analyse(fileNode);
+    positions
+        .map(p => fixPos(--p))
+        .filter(p => /[a-z$_]/.test(jsCode.substr(p, 1)))
+        .filter(p => localVariables.indexOf(jsCode.substr(p).match(/^[a-zA-Z$_]+/)[0]) == -1)
+        .sort((a, b) => b - a)
+        .forEach(p => jsCode = jsCode.substr(0, p) + "this." + jsCode.substr(p));
+    if (positions.length)
+        console.warn("=>", jsCode);
+    return jsCode;
+
+    function analyse(node: ts.Node)
+    {
+        if (node.kind == ts.SyntaxKind.ParenthesizedExpression) {
+            const expr = <ts.ParenthesizedExpression>node;
+            if (expr.expression.kind == ts.SyntaxKind.Identifier)
+                positions.push(expr.expression.pos);
+        }       
+        if (node.kind == ts.SyntaxKind.ElementAccessExpression
+            || node.kind == ts.SyntaxKind.PropertyAccessExpression) {
+            positions.push(node.pos);
+            return;
+        }
+        if (node.kind == ts.SyntaxKind.CallExpression && (<ts.CallExpression>node).expression.kind == ts.SyntaxKind.Identifier)
+            positions.push(node.pos);
+        if (node.kind == ts.SyntaxKind.BinaryExpression) {
+            const binExpr = <ts.BinaryExpression>node;
+            if (binExpr.right.kind == ts.SyntaxKind.Identifier)
+                positions.push(binExpr.right.pos);
+            if (binExpr.left.kind == ts.SyntaxKind.Identifier)
+                positions.push(binExpr.left.pos);
+        }
+        ts.forEachChild(node, analyse);
+    }
+
+    function fixPos(pos) {
+        while(/\s/.test(jsCode.substr(pos, 1)) && pos < jsCode.length)
+            pos++;
+
+        return pos;
+    }
+
+}
+
+export = vue2jsx;

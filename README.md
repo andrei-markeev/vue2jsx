@@ -49,8 +49,8 @@ results in this output:
 ```jsx
 const render = function(h) { return (
     <div>
-        { user ? <h1>Hello, { user.name }!</h1>
-         : users ? <div>
+        { this.user ? <h1>Hello, { this.user.name }!</h1>
+         : this.users ? <div>
             Hello to all of you:
             <ul>
                 { this.users.map(u => <li key={ u.id }>u.name</li>) }!
