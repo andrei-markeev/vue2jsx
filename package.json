@@ -1,6 +1,6 @@
 {
   "name": "vue2jsx",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "description": "Convert Vue html templates to their JSX representation.",
   "main": "vue2jsx.js",
   "bin": {
